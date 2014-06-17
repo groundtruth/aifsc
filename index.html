@@ -12,7 +12,11 @@
     width:100%;
     padding:0px;
     margin:0px;
-    } 
+    }
+
+    .popupLabel {
+      color:grey;
+    }
   </style>
 
 </head>
@@ -20,7 +24,17 @@
   <div id="map"></div>
 
   <script src="lib/jquery-1.11.1.min.js"></script>
+  <script src="lib/mustache.js"></script>
   <script src="lib/leaflet/leaflet-src.js"></script>
+
+  <script id="template" type="x-tmpl-mustache">
+    <span class="popupLabel">UN ID</span> {{ un_id }} <br>
+    <span class="popupLabel">Country</span> {{ country }} <br>
+    <span class="popupLabel">Project manager</span> {{ aciar_project_manager }} <br>
+    <span class="popupLabel">Official web page</span> <a href="{{ project_url }}" target="blank"> link </a> <br>
+    <hr>
+    <a class="zoomTo" href="#{{ un_id }}">Zoom in</a><a class="zoomTo" style="float:right;" href="#">Zoom out</a>
+  </script>
 
   <script>
 
@@ -36,24 +50,83 @@
       id: 'examples.map-i86knfo3'
     }).addTo(map);
 
+    var template = $('#template').html();
+    Mustache.parse(template);   // optional, speeds up future uses
+
+    // Attaching a popup with a rendered Mustache template to a feature
+    function attachPopup(feature, layer) {
+      // does this feature have a property named popupContent?
+      if (feature.properties) {
+        var rendered = Mustache.render(template, feature.properties);
+        layer.bindPopup(rendered);
+      }
+    };
+
+    function zoomToProject(id) {
+      if (id)
+      {
+        // Find the project in the projectLayer by its UN ID
+        var projectFeature;
+        for (l in projectLayer._layers)
+        {
+          if (projectLayer._layers[l].feature.properties.un_id == id)
+          {
+            console.log("Found it!");
+            // Getting the feature properties in a variable
+            projectFeature = projectLayer._layers[l];
+            break;
+          }
+        }
+
+        // Zoom to this project (center, and increase zoom level)
+        map.setView(L.latLng(projectFeature.feature.properties.dd_y, projectFeature.feature.properties.dd_x),6,{animate:true});
+
+        // Opening up the popup on this feature
+        projectFeature.openPopup();
+      }
+      else
+      {
+        // Setting the viewport to the data bounds
+        map.fitBounds(projectLayer.getBounds());
+      }
+    }
+
+    // Get project ID from URL
+    var projectIdInUrl;
+    if(window.location.hash) {
+      // Fragment exists
+      projectIdInUrl = window.location.hash.substr(1);
+    }
+
     // The vector layer to overlay comes from CartoDB via the "sql" endpoint
-    var projectLayer = new L.GeoJSON();
+    var projectLayer = new L.GeoJSON(null,{
+      onEachFeature: attachPopup
+    });
+
+    // Adding the layer to the map
+    map.addLayer(projectLayer);
 
     $.getJSON(
         "http://aciar.cartodb.com/api/v2/sql?q=SELECT%20*%20FROM%20aciar_projects%20WHERE%20dd_y%20%3C%3E%20%27%27%20AND%20dd_x%20%3C%3E%20%27%27&format=geojson&callback=?",
         function(geojson) {
           $.each(geojson.features, function(i, feature) {
             projectLayer.addData(feature);
-            projectLayer.bindPopup(feature.properties.country);
           });
 
-          // Setting the viewport to the data bounds
-          map.fitBounds(projectLayer.getBounds());
+          // Zoom to project in URL or to bounding box of all projects
+          zoomToProject(projectIdInUrl);
         }
     );
 
-    // Adding the layer to the map
-    map.addLayer(projectLayer);
+    map.on('popupopen', function() {  
+      $('a.zoomTo').click(function(){
+        // Clicked project
+        var clickedProject = $(this).attr("href").substr(1);
+        console.log(clickedProject);
+        zoomToProject(clickedProject);
+      });
+    });
+
 
   </script>
 </body>
