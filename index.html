@@ -5,7 +5,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0,  user-scalable=no">
   <link rel="stylesheet" href="lib/leaflet/leaflet.css" />
-  
+  <link rel="stylesheet" href="lib/select2/select2.css" />
+
   <style>
     html, body, #map {
     height:100%;
@@ -17,13 +18,25 @@
     .popupLabel {
       color:grey;
     }
+
+    .select2-container .select2-choice {
+      height:32px;
+    }
+
+    #select2-chosen-1 {
+      line-height:32px;
+    }
   </style>
 
 </head>
 <body>
   <div id="map"></div>
 
+  <div id="countrySelect" style="position:absolute; top:10px; right:50px; width: 200px;">
+  </div>
+
   <script src="lib/jquery-1.11.1.min.js"></script>
+  <script src="lib/select2/select2.min.js"></script>
   <script src="lib/mustache.js"></script>
   <script src="lib/leaflet/leaflet-src.js"></script>
 
@@ -37,6 +50,11 @@
   </script>
 
   <script>
+
+    function formatCountry(state) {
+      if (!state.id) return state.text; // optgroup
+      return "<img class='flag' src='images/flags/" + state.text.toLowerCase() + ".png'/><p style='vertical-align:top;display:inline;line-height:32px;margin-left:8px;'>" + state.text + "</p>";
+    };
 
     // Not setting the viewport yet (fitting it to the data)
     var map = L.map('map');
@@ -109,9 +127,57 @@
     $.getJSON(
         "http://aciar.cartodb.com/api/v2/sql?q=SELECT%20*%20FROM%20aciar_projects%20WHERE%20dd_y%20%3C%3E%20%27%27%20AND%20dd_x%20%3C%3E%20%27%27&format=geojson&callback=?",
         function(geojson) {
+          var countryArr = [], countrySelect = [], countryId = 0;
+
+          // Adding the GeoJSON data to the Leaflet GeoJSON layer
           $.each(geojson.features, function(i, feature) {
             projectLayer.addData(feature);
+
+            // Build an array of countries without duplicates
+            if($.inArray(feature.properties.country, countryArr) === -1)
+            {
+              countryArr.push(feature.properties.country);
+            }
           });
+
+          // Sorting alphabetically for better presentation
+          countryArr.sort();
+
+          // Building the slect box data array of id/text
+          for (c in countryArr)
+          {
+            countrySelect.push({id:(countryId++).toString(),text:countryArr[c]});
+          }
+
+          // The country array to initialise the country select box
+          $('#countrySelect').select2({
+            data: countrySelect,
+            placeholder: "Filter by country",
+            allowClear: true,
+            formatResult: formatCountry,
+            formatSelection: formatCountry,
+            escapeMarkup: function(m) { return m; }
+          })
+            .on("change", function(e) { 
+              console.log("change "+JSON.stringify({val:e.val, added:e.added, removed:e.removed}));
+              if (e.added)
+              {
+                // A selection has been operated, we need to filter the projects by the selected country
+                $.each(map._layers,function(i,f) {
+                  if (f.feature && f.feature.properties)
+                  {
+                    if (f.feature.properties.country == e.added.text) {f.setOpacity(1);} else {f.setOpacity(0);}
+                  }
+                });
+              }
+              else
+              {
+                // A deselection has been operated, we need to remove the country filter
+                $.each(map._layers,function(i,f) {
+                  if (f.feature) {f.setOpacity(1);}
+                });
+              }
+            });
 
           // Zoom to project in URL or to bounding box of all projects
           zoomToProject(projectIdInUrl);
@@ -126,7 +192,6 @@
         zoomToProject(clickedProject);
       });
     });
-
 
   </script>
 </body>
