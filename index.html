@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ACIAR projects</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0,  user-scalable=no">
+  <link rel="stylesheet" href="lib/leaflet/leaflet.css" />
+  
+  <style>
+    html, body, #map {
+    height:100%;
+    width:100%;
+    padding:0px;
+    margin:0px;
+    } 
+  </style>
+
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="lib/jquery-1.11.1.min.js"></script>
+  <script src="lib/leaflet/leaflet-src.js"></script>
+
+  <script>
+
+    // Not setting the viewport yet (fitting it to the data)
+    var map = L.map('map');
+
+    // Setting a nice looking OSM basemap served from MapBox
+    L.tileLayer('https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
+        '<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
+        'Imagery © <a href="http://mapbox.com">Mapbox</a>',
+      id: 'examples.map-i86knfo3'
+    }).addTo(map);
+
+    // The vector layer to overlay comes from CartoDB via the "sql" endpoint
+    var projectLayer = new L.GeoJSON();
+
+    $.getJSON(
+        "http://aciar.cartodb.com/api/v2/sql?q=SELECT%20*%20FROM%20aciar_projects%20WHERE%20dd_y%20%3C%3E%20%27%27%20AND%20dd_x%20%3C%3E%20%27%27&format=geojson&callback=?",
+        function(geojson) {
+          $.each(geojson.features, function(i, feature) {
+            projectLayer.addData(feature);
+            projectLayer.bindPopup(feature.properties.country);
+          });
+
+          // Setting the viewport to the data bounds
+          map.fitBounds(projectLayer.getBounds());
+        }
+    );
+
+    // Adding the layer to the map
+    map.addLayer(projectLayer);
+
+  </script>
+</body>
+</html>
