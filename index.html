@@ -214,6 +214,11 @@
                   f.closePopup();
                 }
               });
+            }).on("select2-close", function () {
+              setTimeout(function() {
+                  $('.select2-container-active').removeClass('select2-container-active');
+                  $(':focus').blur();
+              }, 1);
             });
 
           // Zoom to project in URL or to bounding box of all projects
