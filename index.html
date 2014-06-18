@@ -9,10 +9,11 @@
 
   <style>
     html, body, #map {
-    height:100%;
-    width:100%;
-    padding:0px;
-    margin:0px;
+      height:100%;
+      width:100%;
+      padding:0px;
+      margin:0px;
+      font-family: "Myriad Pro","Droid Sans",Arial,sans-serif;
     }
 
     .popupLabel {
@@ -32,7 +33,7 @@
 <body>
   <div id="map"></div>
 
-  <div id="countrySelect" style="position:absolute; top:10px; right:50px; width: 200px;">
+  <div id="countrySelect" style="position:absolute; top:15px; right:15px; width: 200px;">
   </div>
 
   <script src="lib/jquery-1.11.1.min.js"></script>
@@ -42,9 +43,11 @@
 
   <script id="template" type="x-tmpl-mustache">
     <span class="popupLabel">UN ID</span> {{ un_id }} <br>
+    <span class="popupLabel">Location</span> {{ approximate_location_nearest_town }} <br>
     <span class="popupLabel">Country</span> {{ country }} <br>
+    <span class="popupLabel">Project leader</span> {{ project_leader }} <br>
     <span class="popupLabel">Project manager</span> {{ aciar_project_manager }} <br>
-    <span class="popupLabel">Official web page</span> <a href="{{ project_url }}" target="blank"> link </a> <br>
+    <span class="popupLabel">Web page</span> <a href="{{ project_url }}" target="blank"> link </a> <br>
     <hr>
     <a class="zoomTo" href="#{{ un_id }}">Zoom in</a><a class="zoomTo" style="float:right;" href="#">Zoom out</a>
   </script>
@@ -57,7 +60,9 @@
     };
 
     // Not setting the viewport yet (fitting it to the data)
-    var map = L.map('map');
+    var map = L.map('map',{
+      zoomAnimationThreshold: 6
+    });
 
     // Setting a nice looking OSM basemap served from MapBox
     L.tileLayer('https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png', {
@@ -89,7 +94,7 @@
         {
           if (projectLayer._layers[l].feature.properties.un_id == id)
           {
-            console.log("Found it!");
+            //console.log("Found it!");
             // Getting the feature properties in a variable
             projectFeature = projectLayer._layers[l];
             break;
@@ -97,7 +102,7 @@
         }
 
         // Zoom to this project (center, and increase zoom level)
-        map.setView(L.latLng(projectFeature.feature.properties.dd_y, projectFeature.feature.properties.dd_x),6,{animate:true});
+        map.setView(new L.latLng(projectFeature.feature.properties.dd_y, projectFeature.feature.properties.dd_x),8,{animate:true});
 
         // Opening up the popup on this feature
         projectFeature.openPopup();
@@ -116,9 +121,24 @@
       projectIdInUrl = window.location.hash.substr(1);
     }
 
+    var geojsonMarkerOptions = {
+      radius: 12,
+      color: "#000",
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.9
+    };
+
+    // 12 colors brewed
+    var colorBrewer = [ '#8dd3c7', '#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f'];
+
     // The vector layer to overlay comes from CartoDB via the "sql" endpoint
     var projectLayer = new L.GeoJSON(null,{
-      onEachFeature: attachPopup
+      onEachFeature: attachPopup,
+      pointToLayer: function (feature,latlng) {
+                      geojsonMarkerOptions.fillColor = colorBrewer[feature.properties.no];
+                      return L.circleMarker(latlng, geojsonMarkerOptions);
+                    }
     });
 
     // Adding the layer to the map
@@ -159,14 +179,18 @@
             escapeMarkup: function(m) { return m; }
           })
             .on("change", function(e) { 
-              console.log("change "+JSON.stringify({val:e.val, added:e.added, removed:e.removed}));
+              //console.log("change "+JSON.stringify({val:e.val, added:e.added, removed:e.removed}));
+              var visibleFeatureArr = [];
               if (e.added)
               {
                 // A selection has been operated, we need to filter the projects by the selected country
                 $.each(map._layers,function(i,f) {
                   if (f.feature && f.feature.properties)
                   {
-                    if (f.feature.properties.country == e.added.text) {f.setOpacity(1);} else {f.setOpacity(0);}
+                    if (f.feature.properties.country == e.added.text) {
+                      f.setStyle({opacity:0.9,fillOpacity:0.9});
+                      visibleFeatureArr.push(new L.latLng(f.feature.properties.dd_y,f.feature.properties.dd_x));
+                    } else {f.setStyle({opacity:0.3,fillOpacity:0.3});}
                   }
                 });
               }
@@ -174,9 +198,22 @@
               {
                 // A deselection has been operated, we need to remove the country filter
                 $.each(map._layers,function(i,f) {
-                  if (f.feature) {f.setOpacity(1);}
+                  if (f.feature) {
+                    f.setStyle({opacity:0.9,fillOpacity:0.9});
+                    visibleFeatureArr.push(new L.latLng(f.feature.properties.dd_y,f.feature.properties.dd_x));
+                  }
                 });
               }
+
+              // Setting the viewport to these visible features only, with a 10% buffer
+              map.fitBounds(new L.latLngBounds(visibleFeatureArr).pad(0.1));
+
+              // Closing a popup if it was opened
+              $.each(map._layers,function(i,f) {
+                if (f.closePopup) {
+                  f.closePopup();
+                }
+              });
             });
 
           // Zoom to project in URL or to bounding box of all projects
@@ -188,7 +225,7 @@
       $('a.zoomTo').click(function(){
         // Clicked project
         var clickedProject = $(this).attr("href").substr(1);
-        console.log(clickedProject);
+        //console.log(clickedProject);
         zoomToProject(clickedProject);
       });
     });
