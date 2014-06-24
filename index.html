@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ACIAR projects</title>
+  <title>AIFSRC projects</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0,  user-scalable=no">
   <link rel="stylesheet" href="lib/leaflet/leaflet.css" />
@@ -147,7 +147,7 @@
     map.addLayer(projectLayer);
 
     $.getJSON(
-        "http://aciar.cartodb.com/api/v2/sql?q=SELECT%20*%20FROM%20aciar_projects%20WHERE%20latitude%20%3C%3E%20%27%27%20AND%20longitude%20%3C%3E%20%27%27&format=geojson&callback=?",
+        "http://aifsrc.cartodb.com/api/v2/sql?q=SELECT%20*%20FROM%20aifsrc_projects%20WHERE%20the_geom%20IS%20NOT%20NULL&format=geojson&callback=?",
         function(geojson) {
           var countryArr = [], countrySelect = [], countryId = 0;
 
