@@ -104,7 +104,7 @@
         }
 
         // Zoom to this project (center, and increase zoom level)
-        map.setView(new L.latLng(projectFeature.feature.properties.dd_y, projectFeature.feature.properties.dd_x),8,{animate:true});
+        map.setView(new L.latLng(projectFeature.feature.properties.latitude, projectFeature.feature.properties.longitude),8,{animate:true});
 
         // Opening up the popup on this feature
         projectFeature.openPopup();
@@ -147,7 +147,7 @@
     map.addLayer(projectLayer);
 
     $.getJSON(
-        "http://aciar.cartodb.com/api/v2/sql?q=SELECT%20*%20FROM%20aciar_projects%20WHERE%20dd_y%20%3C%3E%20%27%27%20AND%20dd_x%20%3C%3E%20%27%27&format=geojson&callback=?",
+        "http://aciar.cartodb.com/api/v2/sql?q=SELECT%20*%20FROM%20aciar_projects%20WHERE%20latitude%20%3C%3E%20%27%27%20AND%20longitude%20%3C%3E%20%27%27&format=geojson&callback=?",
         function(geojson) {
           var countryArr = [], countrySelect = [], countryId = 0;
 
@@ -191,7 +191,7 @@
                   {
                     if (f.feature.properties.country == e.added.text) {
                       f.setStyle({opacity:0.9,fillOpacity:0.9});
-                      visibleFeatureArr.push(new L.latLng(f.feature.properties.dd_y,f.feature.properties.dd_x));
+                      visibleFeatureArr.push(new L.latLng(f.feature.properties.latitude,f.feature.properties.longitude));
                     } else {f.setStyle({opacity:0.3,fillOpacity:0.3});}
                   }
                 });
@@ -202,7 +202,7 @@
                 $.each(map._layers,function(i,f) {
                   if (f.feature) {
                     f.setStyle({opacity:0.9,fillOpacity:0.9});
-                    visibleFeatureArr.push(new L.latLng(f.feature.properties.dd_y,f.feature.properties.dd_x));
+                    visibleFeatureArr.push(new L.latLng(f.feature.properties.latitude,f.feature.properties.longitude));
                   }
                 });
               }
