@@ -56,6 +56,12 @@
 
   <script>
 
+    var opacityFilteredProjIn = 0.9;
+    var opacityFilteredProjOut = 0.3;
+    var extendLat = 0.25;
+    var extendLng = 0.25;
+    var paddingAroundFilteredProj = 0.1;
+
     function formatCountry(state) {
       if (!state.id) return state.text; // optgroup
       return "<img class='flag' src='images/flags/" + state.text.toLowerCase() + ".png'/><p style='vertical-align:top;display:inline;line-height:32px;margin-left:8px;'>" + state.text + "</p>";
@@ -80,7 +86,6 @@
 
     // Attaching a popup with a rendered Mustache template to a feature
     function attachPopup(feature, layer) {
-      // does this feature have a property named popupContent?
       if (feature.properties) {
         var rendered = Mustache.render(template, feature.properties);
         layer.bindPopup(rendered);
@@ -90,24 +95,66 @@
     function zoomToProject(id) {
       if (id)
       {
-        // Find the project in the projectLayer by its UN ID
-        var projectFeature;
-        for (l in projectLayer._layers)
+        var projectFeature, projBBoxArr = [], openPopup = false;
+
+        // Find the project in the projectLayer by its UN ID (if starts with numeric)
+        if (/^\d.*/.test(id))
         {
-          if (projectLayer._layers[l].feature.properties.un_id == id)
+          for (l in projectLayer._layers)
           {
-            //console.log("Found it!");
-            // Getting the feature properties in a variable
-            projectFeature = projectLayer._layers[l];
-            break;
-          }
+            if (projectLayer._layers[l].feature.properties.un_id == Number(id))
+            {
+              // Getting the feature properties in a variable
+              projectFeature = projectLayer._layers[l];
+              var pflat = Number(projectFeature.feature.properties.latitude);
+              var pflng = Number(projectFeature.feature.properties.longitude);
+              projBBoxArr.push(new L.latLng(pflat, pflng));
+
+              openPopup = true;
+              break;
+            }
+          }          
+        }
+        else
+        {
+          // Extracting the numeric part of the project ID
+          id = id.replace("P","");
+          // Find the project in the projectLayer by its project ID (otherwise)
+          for (l in projectLayer._layers)
+          {
+            if (projectLayer._layers[l].feature.properties.no == Number(id))
+            {
+              // Getting the feature properties in a variable
+              projectFeature = projectLayer._layers[l];
+              var pflat = Number(projectFeature.feature.properties.latitude);
+              var pflng = Number(projectFeature.feature.properties.longitude);
+              projBBoxArr.push(new L.latLng(pflat, pflng));
+            }
+          }          
         }
 
-        // Zoom to this project (center, and increase zoom level)
-        map.setView(new L.latLng(projectFeature.feature.properties.latitude, projectFeature.feature.properties.longitude),8,{animate:true});
+        if (projBBoxArr.length)
+        {
+          // Manual extension of the bounding box array so that it includes a significant portion of the map
+          if (projBBoxArr.length == 1)
+          {
+            projBBoxArr.push(new L.latLng(projBBoxArr[0].lat - extendLat, projBBoxArr[0].lng - extendLng));
+            projBBoxArr.push(new L.latLng(projBBoxArr[0].lat + extendLat, projBBoxArr[0].lng + extendLng));
+          }
 
-        // Opening up the popup on this feature
-        projectFeature.openPopup();
+          // Zoom to this/these project(s)
+          map.fitBounds(new L.latLngBounds(projBBoxArr).pad(paddingAroundFilteredProj));
+
+          // Opening up the popup if required
+          if (openPopup)
+          {
+            projectFeature.openPopup();
+          }
+        }
+        else
+        {
+          alert("No project with ID "+id+" was found. Please check the URL and/or the backend spreadsheet.");
+        }
       }
       else
       {
@@ -127,8 +174,8 @@
       radius: 12,
       color: "#000",
       weight: 2,
-      opacity: 1,
-      fillOpacity: 0.9
+      opacity: opacityFilteredProjIn,
+      fillOpacity: opacityFilteredProjIn
     };
 
     // 12 colors brewed
@@ -153,13 +200,32 @@
 
           // Adding the GeoJSON data to the Leaflet GeoJSON layer
           $.each(geojson.features, function(i, feature) {
-            projectLayer.addData(feature);
+            var filterOutFeature = false;
 
-            // Build an array of countries without duplicates
-            if($.inArray(feature.properties.country, countryArr) === -1)
+            // If restricting by project, we just do not load the features of other projects
+            // Reasons: 
+            // 1) readability (other projects, even less opaque still clutter the map)
+            // 2) popup sometimes hijacked by another project's, with no control which popup will open (even when other marker's opacity is 0)
+
+            if (/^P.*/.test(projectIdInUrl))
             {
-              countryArr.push(feature.properties.country);
+              if (feature.properties.no !== Number(projectIdInUrl.replace("P","")))
+              {
+                filterOutFeature = true;
+              }
             }
+
+            if (!filterOutFeature)
+            {
+              projectLayer.addData(feature);
+
+              // Build an array of countries without duplicates
+              if($.inArray(feature.properties.country, countryArr) === -1)
+              {
+                countryArr.push(feature.properties.country);
+              }
+            }
+
           });
 
           // Sorting alphabetically for better presentation
@@ -190,9 +256,9 @@
                   if (f.feature && f.feature.properties)
                   {
                     if (f.feature.properties.country == e.added.text) {
-                      f.setStyle({opacity:0.9,fillOpacity:0.9});
+                      f.setStyle({opacity:opacityFilteredProjIn,fillOpacity:opacityFilteredProjIn});
                       visibleFeatureArr.push(new L.latLng(f.feature.properties.latitude,f.feature.properties.longitude));
-                    } else {f.setStyle({opacity:0.3,fillOpacity:0.3});}
+                    } else {f.setStyle({opacity:opacityFilteredProjOut,fillOpacity:opacityFilteredProjOut});}
                   }
                 });
               }
@@ -201,14 +267,21 @@
                 // A deselection has been operated, we need to remove the country filter
                 $.each(map._layers,function(i,f) {
                   if (f.feature) {
-                    f.setStyle({opacity:0.9,fillOpacity:0.9});
+                    f.setStyle({opacity:opacityFilteredProjIn,fillOpacity:opacityFilteredProjIn});
                     visibleFeatureArr.push(new L.latLng(f.feature.properties.latitude,f.feature.properties.longitude));
                   }
                 });
               }
 
+              // Manual adjustment to extend the bounding box if only one project
+              if (visibleFeatureArr.length == 1)
+              {
+                visibleFeatureArr.push(new L.latLng(visibleFeatureArr[0].lat - extendLat, visibleFeatureArr[0].lng - extendLng));
+                visibleFeatureArr.push(new L.latLng(visibleFeatureArr[0].lat + extendLat, visibleFeatureArr[0].lng + extendLng));
+              }
+
               // Setting the viewport to these visible features only, with a 10% buffer
-              map.fitBounds(new L.latLngBounds(visibleFeatureArr).pad(0.1));
+              map.fitBounds(new L.latLngBounds(visibleFeatureArr).pad(paddingAroundFilteredProj));
 
               // Closing a popup if it was opened
               $.each(map._layers,function(i,f) {
