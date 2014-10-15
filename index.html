@@ -73,6 +73,8 @@
     });
 
     // Setting a nice looking OSM basemap served from MapBox
+    // Please use your own MapBox token on the line below
+    L.mapbox.accessToken = 'pk.eyJ1IjoiaHNlbm90IiwiYSI6IklFRlVnT2cifQ.4EMXk4fgTuB-kI1x1x3vGw';
     L.tileLayer('https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png', {
       maxZoom: 18,
       attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
